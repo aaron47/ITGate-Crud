@@ -1,11 +1,12 @@
-import { JwtPayload } from './../strategy/jwt.strategy';
 import { CreateUserDto } from './../dto/CreateUserDto.dto';
 import { UsersService } from './../users/users.service';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { ConfigService } from '@nestjs/config';
-import { Tokens } from 'src/utils/types';
+import { Response } from 'express';
+import { JwtPayload } from 'src/types';
+import { Tokens } from 'src/types/Tokens.type';
 
 @Injectable()
 export class AuthService {
@@ -42,31 +43,59 @@ export class AuthService {
       throw new BadRequestException('User already exists');
     }
 
-    const tokens = await this.getTokens(user._id, user.username);
-    await this.updateRefreshTokenHash(user._id, tokens.refresh_token);
-    return tokens;
+    const newUser = await this.usersService.create(createUserDto);
+
+    const tokens = await this.getTokens(newUser._id, newUser.username);
+    await this.updateRefreshTokenHash(newUser._id, tokens.refresh_token);
+
+    return { newUser, ...tokens };
   }
 
-  async login(createUserDto: CreateUserDto): Promise<Tokens> {
+  async login(createUserDto: CreateUserDto, res: Response) {
     const user = await this.validateUser(createUserDto);
 
-    if (user) {
-      const tokens = await this.getTokens(user._id, user.username);
-      await this.updateRefreshTokenHash(user._id, tokens.refresh_token);
-      return tokens;
+    if (!user) {
+      res.clearCookie('jid', {
+        httpOnly: true,
+        sameSite: 'none',
+        secure: true,
+      });
+      res.clearCookie('lind', {
+        httpOnly: true,
+        sameSite: 'none',
+        secure: true,
+      });
+
+      throw new BadRequestException('Invalid credentials');
     }
 
-    throw new BadRequestException('Invalid credentials');
+    const tokens = await this.getTokens(user._id, user.username);
+    await this.updateRefreshTokenHash(user._id, tokens.refresh_token);
+    res.cookie('jid', tokens.access_token, {
+      httpOnly: true,
+      sameSite: 'none',
+      secure: true,
+    });
+    res.cookie('lind', tokens.refresh_token, {
+      httpOnly: true,
+      sameSite: 'none',
+      secure: true,
+    });
+
+    return {
+      user,
+      ...tokens,
+    };
   }
 
-  async logout(username: string) {
-    const user = await this.usersService.findOneByUsername(username);
+  async logout(userId: string) {
+    const user = await this.usersService.findOneById(userId);
     await this.usersService.updateOne(user._id, { hashedRt: '' });
     return true;
   }
 
-  async refreshTokens(username: string, refreshToken: string): Promise<Tokens> {
-    const user = await this.usersService.findOneByUsername(username);
+  async refreshTokens(userId: string, refreshToken: string): Promise<Tokens> {
+    const user = await this.usersService.findOneById(userId);
 
     if (user) {
       const isRefreshTokenValid = await argon2.verify(
@@ -84,12 +113,16 @@ export class AuthService {
     throw new BadRequestException('Invalid refresh token');
   }
 
-  async updateRefreshTokenHash(userId: string, refreshToken: string) {
-    const hash = await argon2.hash(refreshToken);
+  private async hashData(data: string) {
+    return argon2.hash(data);
+  }
+
+  private async updateRefreshTokenHash(userId: string, refreshToken: string) {
+    const hash = await this.hashData(refreshToken);
     return this.usersService.updateOne(userId, { hashedRt: hash });
   }
 
-  async getTokens(userId: string, username: string): Promise<Tokens> {
+  private async getTokens(userId: string, username: string): Promise<Tokens> {
     const jwtPayload: JwtPayload = {
       sub: userId,
       username,
