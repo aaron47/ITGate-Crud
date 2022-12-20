@@ -98,16 +98,16 @@ export class AuthService {
     const user = await this.usersService.findOneById(userId);
 
     if (user) {
-      const isRefreshTokenValid = await argon2.verify(
-        user.hashedRt,
-        refreshToken,
-      );
+      // const isRefreshTokenValid = await argon2.verify(
+      //   user.hashedRt,
+      //   refreshToken,
+      // );
 
-      if (isRefreshTokenValid) {
-        const tokens = await this.getTokens(user._id, user.username);
-        await this.updateRefreshTokenHash(user._id, tokens.refresh_token);
-        return tokens;
-      }
+      // if (isRefreshTokenValid) {
+      const tokens = await this.getTokens(user._id, user.username);
+      await this.updateRefreshTokenHash(user._id, tokens.refresh_token);
+      return tokens;
+      // }
     }
 
     throw new BadRequestException('Invalid refresh token');

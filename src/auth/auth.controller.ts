@@ -1,20 +1,26 @@
-import { AccessTokenGuard } from './../guards/AcessTokenGuard.guard';
+import { AccessTokenInterceptor } from './common/interceptors';
 import { AuthService } from './auth.service';
 import {
   Body,
+  Catch,
   Controller,
   HttpCode,
   HttpStatus,
   Post,
   Res,
+  UseFilters,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { CreateUserDto } from 'src/dto/CreateUserDto.dto';
 import { Response } from 'express';
-import { GetCurrentUser, Public } from 'src/decorators';
-import { RefreshTokenGuard } from 'src/guards';
+import { GetCurrentUser, Public } from 'src/auth/common/decorators';
+import { RefreshTokenGuard } from 'src/auth/common/guards';
+import { RefreshTokenInterceptor } from './common/interceptors/refresh-token.interceptor';
+import { HttpExceptionFilter } from './common/filters';
 
 @Controller('auth')
+@UseFilters(HttpExceptionFilter)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -62,6 +68,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseInterceptors(AccessTokenInterceptor)
   @HttpCode(HttpStatus.OK)
   async logout(@GetCurrentUser('sub') userId: string): Promise<boolean> {
     return this.authService.logout(userId);
@@ -69,6 +76,7 @@ export class AuthController {
 
   @Public()
   @UseGuards(RefreshTokenGuard)
+  @UseInterceptors(RefreshTokenInterceptor)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refreshTokens(

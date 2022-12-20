@@ -5,7 +5,7 @@ import { UsersModule } from './users/users.module';
 import * as Joi from 'joi';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
-import { AccessTokenGuard } from './guards';
+import { AccessTokenGuard } from './auth/common/guards';
 
 @Module({
   imports: [
