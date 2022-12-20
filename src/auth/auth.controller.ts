@@ -70,7 +70,20 @@ export class AuthController {
   @Post('logout')
   @UseInterceptors(AccessTokenInterceptor)
   @HttpCode(HttpStatus.OK)
-  async logout(@GetCurrentUser('sub') userId: string): Promise<boolean> {
+  async logout(
+    @GetCurrentUser('sub') userId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<boolean> {
+    res.clearCookie('jid', {
+      httpOnly: true,
+      sameSite: 'none',
+      secure: true,
+    });
+    res.clearCookie('lind', {
+      httpOnly: true,
+      sameSite: 'none',
+      secure: true,
+    });
     return this.authService.logout(userId);
   }
 
