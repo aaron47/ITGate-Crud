@@ -2,7 +2,6 @@ import { AccessTokenInterceptor } from './common/interceptors';
 import { AuthService } from './auth.service';
 import {
   Body,
-  Catch,
   Controller,
   HttpCode,
   HttpStatus,
@@ -18,6 +17,7 @@ import { GetCurrentUser, Public } from 'src/auth/common/decorators';
 import { RefreshTokenGuard } from 'src/auth/common/guards';
 import { RefreshTokenInterceptor } from './common/interceptors/refresh-token.interceptor';
 import { HttpExceptionFilter } from './common/filters';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 @UseFilters(HttpExceptionFilter)
@@ -25,6 +25,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Throttle(3, 60)
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   async signUp(
@@ -53,6 +54,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(3, 60)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
@@ -84,12 +86,14 @@ export class AuthController {
       sameSite: 'none',
       secure: true,
     });
+
     return this.authService.logout(userId);
   }
 
   @Public()
   @UseGuards(RefreshTokenGuard)
   @UseInterceptors(RefreshTokenInterceptor)
+  @Throttle(3, 60)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refreshTokens(
